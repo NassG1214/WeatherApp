@@ -1,0 +1,27 @@
+nav{
+    height: 100px;
+    width: fit-content(100%);
+}
+#s1{
+    display: flex;
+}
+.containers{
+    width: fit-content(100%);
+    height: 1000px;
+    background: orange;
+    opacity: 20%;
+    border: solid black;
+    margin-bottom: 10px;
+}
+.weatherDiv{
+    height: 250px;
+    width: 250px;
+    position: relative;
+
+}
+#icon{
+    background: blue;
+}
+#info{
+    background: red;
+}
