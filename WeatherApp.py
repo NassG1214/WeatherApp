@@ -1,106 +1,103 @@
 import requests
-import json
 
 
-def greetings():
-    while True:
-        key = input("For the keys, choose from these options: \n"
-                    "coord, weather, main (temperature), visibility, wind, clouds, sys(info of city)\n"
-                    "If finished please hit the enter key or type \"stop\" \n\n")
-        if key == "" or key == "stop":
-            break
-        greeting_key_options(key)
+def get_location_from_user():
+    while True:  # Loop until valid input is received
+        try:
+            prompt = input("Input city with state, e.g., 'Miami, Florida, US'; 'London, England, GB':\n").strip()
+            if not prompt:
+                print("Input cannot be blank. Please enter the city, state, and country code.")
+                continue
+            parts = [part.strip() for part in prompt.split(",")]
+            if len(parts) < 3:
+                print("Incomplete information. Please make sure to input city, state, and country code.")
+                continue
+            return {"city": parts[0], "state_code": parts[1], "country_code": parts[2]}
+        except Exception as e:
+            print(f"An error occurred: {e}. Please try again.")
 
 
-def data_searcher(key: str, value: str):
-    data = api_searcher[key][value]
-    return f"{value}:\t {data}"
+def fetch_geolocation(city, state_code, country_code):
+    geo_url = (f"http://api.openweathermap.org/geo/1.0/direct?q={city},{state_code},{country_code}&appid"
+               f"=3bf43bfc7f398795202454021da742f5")
+    response = requests.get(geo_url).json()
+    if not response:
+        print("Could not find the location. Please check the inputs and try again.")
+        return None, None
+    return response[0]['lat'], response[0]['lon']
 
 
-def greeting_key_options(key: str):
-    while True:
-        if key == "coord":
-            value = input("Choose from the following: lon (longitude), lat (Latitude)"
-                          "\t\n If finished please hit the enter key or type \"stop\"   \n")
-            if value == "" or value == "stop":
-                break
+def fetch_weather_data(lat, lon):
+    if lat is None or lon is None:  # Skip request if geolocation failed
+        return None
+    weather_url = (f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid"
+                   f"=3bf43bfc7f398795202454021da742f5")
+    response = requests.get(weather_url).json()
+    if response.get('cod') != 200:
+        print("Failed to fetch weather data. Please try again later.")
+        return None
+    return response
+
+
+def kelvin_to_fahrenheit(kelvin):
+    return f"{(kelvin - 273.15) * 9 / 5 + 32:.2f}"
+
+
+def kelvin_to_celsius(kelvin):
+    return f"{kelvin - 273.15:.2f}"
+
+
+def print_weather_data(data):
+    if not data:
+        return  # Skip if no data
+    key_mapping = {
+        "coord": ["lon", "lat"],
+        "weather": ["id", "main", "description"],
+        "main": ["temp", "feels_like", "temp_min", "temp_max", "pressure", "humidity"],
+        "visibility": [],
+        "wind": ["speed", "deg"],
+        "clouds": ["all"],
+        "sys": ["type", "id", "country", "sunrise", "sunset"],
+    }
+
+    key = input(
+        "Choose from the following keys: coord, weather, main (temperature), visibility, wind, clouds, sys (info of "
+        "city). Type 'stop' to finish:\n").lower()
+    while key != "stop":
+        if key in key_mapping:
+            process_weather_data_choice(data, key, key_mapping)
+        else:
+            print("Invalid key, please try again.")
+        key = input("Choose another key or type 'stop' to finish:\n").lower()
+
+
+def process_weather_data_choice(data, key, key_mapping):
+    if key == "main":
+        for sub_key in key_mapping[key]:
+            if sub_key in ["temp", "feels_like", "temp_min", "temp_max"]:
+                print(
+                    f"{sub_key}: {kelvin_to_fahrenheit(data[key][sub_key])}F / {kelvin_to_celsius(data[key][sub_key])}C")
             else:
-                print(data_searcher(key, value))
-        if key == "weather":
-            value = input("Choose from the following: id, main (general description), description"
-                          "\t\n If finished please hit the enter key or type \"stop\"   \n")
-            if value == "" or value == "stop":
-                break
-            else:
-                print(api_searcher["weather"][0][value])
-        if key == "main":
-            temperature()
-        if key == "visibility":
-            print(api_searcher["visibility"])
-            break
-
-        if key == "wind":
-            value = input("Choose from the following: speed, deg"
-                          "\t\n If finished please hit the enter key or type \"stop\"   \n")
-            if value == "" or value == "stop":
-                break
-            else:
-                print(data_searcher(key, value))
-        if key == "clouds":
-            data_searcher(key, "all")
-            break
-        if key == "sys":
-            value = input("Choose from the following: type, id, country, sunrise, sunset"
-                          "\t\n If finished please hit the enter key or type \"stop\"   \n")
-            if value == "" or value == "stop":
-                break
-            else:
-                print(data_searcher(key, value))
-
-
-def kelvin_to_f(key: str):
-    f_temp = int(api_searcher["main"][key])
-    results = (f_temp - 273.15) * 9 / 5 + 32
-    return f'{round(results)} °F'
-
-
-def kelvin_to_c(key: str):
-    c_temp = int(api_searcher["main"][key])
-    results = c_temp - 273.15
-    return f'{round(results)} °C'
-
-
-def kelvin_to_f_c(key: str):
-    return f"{key}:\t {kelvin_to_f(key)} \t {kelvin_to_c(key)}"
-
-
-def temperature():
-    value = input("Enter one of the following to see the temperature: \n"
-                  "temp, feels_like, min temp, max temp, pressure, and humidity"
-                  " for all type all.\n")
-    if value == "all":
-        print(kelvin_to_f_c("temp"))
-        print(kelvin_to_f_c("feels_like"))
-        print(kelvin_to_f_c("temp_min"))
-        print(kelvin_to_f_c("temp_max"))
-        print(data_searcher("main", "pressure"))
-        print(data_searcher("main", "humidity"))
-    elif value == "pressure" or value == "humidity":
-        data_searcher("main", value)
+                print(f"{sub_key}: {data[key][sub_key]}")
+    elif key == "visibility":
+        print(f"Visibility: {data[key]} meters")
     else:
-        print(kelvin_to_f_c(value))
+        for sub_key in key_mapping[key]:
+            print(f"{sub_key}: {data[key][sub_key] if key != 'weather' else data[key][0][sub_key]}")
 
 
-city = input("Input city\n")
-url = (f"https://api.openweathermap.org/data/2.5/weather?q={city}"
-       "&appid=3bf43bfc7f398795202454021da742f5")
+def main():
+    location = get_location_from_user()
+    if not location:
+        return  # End if the location input was invalid
+    lat, lon = fetch_geolocation(**location)
+    if lat is None or lon is None:
+        return  # End if the geolocation lookup failed
+    weather_data = fetch_weather_data(lat, lon)
+    if not weather_data:
+        return  # End if the weather data fetch failed
+    print_weather_data(weather_data)
 
-payload = {}
-headers = {}
 
-response = requests.request("GET", url, headers=headers, data=payload)
-
-# Loads the information based on inputs such as city
-api_searcher = json.loads(response.text)
-
-greetings()
+if __name__ == "__main__":
+    main()
